@@ -1,1 +1,7 @@
 project_id = "bghxiqlldjmhniucrxqh"
+
+[functions.generate-script]
+verify_jwt = true
+
+[functions.check-limits]
+verify_jwt = false

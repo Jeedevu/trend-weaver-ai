@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { TrendCard } from "@/components/dashboard/TrendCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,78 +11,67 @@ import {
   TrendingUp,
   Sparkles,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 
-const allTrends = [
-  {
-    name: "Fast Facts Dark Mode",
-    description: "Quick facts with AI voice over dark minimalist backgrounds. High engagement, easy to produce.",
-    velocityScore: 92,
-    shelfLife: "2-3 weeks",
-    aiSuitability: 95,
-    category: "Educational",
-    isHot: true,
-  },
-  {
-    name: "POV Shocking Stats",
-    description: "First-person view revealing surprising statistics in under 10 seconds with dramatic reveal.",
-    velocityScore: 87,
-    shelfLife: "1-2 weeks",
-    aiSuitability: 88,
-    category: "Statistics",
-    isHot: true,
-  },
-  {
-    name: "This vs That Comparisons",
-    description: "Side-by-side visual comparisons with quick transitions and bold text overlays.",
-    velocityScore: 78,
-    shelfLife: "3-4 weeks",
-    aiSuitability: 82,
-    category: "Comparison",
-    isHot: false,
-  },
-  {
-    name: "Historical Events Today",
-    description: "On this day in history format with archival imagery and dramatic narration.",
-    velocityScore: 71,
-    shelfLife: "Evergreen",
-    aiSuitability: 79,
-    category: "History",
-    isHot: false,
-  },
-  {
-    name: "Mind-Blowing Science",
-    description: "Scientific phenomena explained with stunning visuals and dramatic reveals.",
-    velocityScore: 84,
-    shelfLife: "2-3 weeks",
-    aiSuitability: 91,
-    category: "Science",
-    isHot: true,
-  },
-  {
-    name: "Life Hacks Quick Tips",
-    description: "Practical life hacks demonstrated quickly with satisfying outcomes.",
-    velocityScore: 69,
-    shelfLife: "1-2 weeks",
-    aiSuitability: 75,
-    category: "Lifestyle",
-    isHot: false,
-  },
-];
-
-const categories = ["All", "Educational", "Statistics", "Comparison", "History", "Science", "Lifestyle"];
+interface Trend {
+  id: string;
+  name: string;
+  description: string;
+  velocity_score: number;
+  shelf_life: string;
+  ai_suitability_score: number;
+  category: string;
+  is_hot: boolean;
+}
 
 const Trends = () => {
+  const [trends, setTrends] = useState<Trend[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredTrends = allTrends.filter((trend) => {
+  useEffect(() => {
+    fetchTrends();
+  }, []);
+
+  const fetchTrends = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('trends')
+        .select('*')
+        .eq('status', 'active')
+        .order('velocity_score', { ascending: false });
+
+      if (error) throw error;
+      setTrends(data || []);
+    } catch (error) {
+      console.error('Error fetching trends:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categories = ["All", ...new Set(trends.map(t => t.category).filter(Boolean))];
+
+  const filteredTrends = trends.filter((trend) => {
     const matchesCategory = selectedCategory === "All" || trend.category === selectedCategory;
     const matchesSearch = trend.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         trend.description.toLowerCase().includes(searchQuery.toLowerCase());
+                         (trend.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const hotTrendsCount = trends.filter(t => t.is_hot).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -103,7 +93,7 @@ const Trends = () => {
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <p className="text-2xl font-bold">3</p>
+            <p className="text-2xl font-bold">{hotTrendsCount}</p>
             <p className="text-sm text-muted-foreground">Hot Trends</p>
           </div>
         </div>
@@ -112,7 +102,7 @@ const Trends = () => {
             <TrendingUp className="h-6 w-6 text-success" />
           </div>
           <div>
-            <p className="text-2xl font-bold">6</p>
+            <p className="text-2xl font-bold">{trends.length}</p>
             <p className="text-sm text-muted-foreground">Active Trends</p>
           </div>
         </div>
@@ -121,7 +111,7 @@ const Trends = () => {
             <Clock className="h-6 w-6 text-warning" />
           </div>
           <div>
-            <p className="text-2xl font-bold">2h ago</p>
+            <p className="text-2xl font-bold">Live</p>
             <p className="text-sm text-muted-foreground">Last Updated</p>
           </div>
         </div>
@@ -150,7 +140,7 @@ const Trends = () => {
             </Badge>
           ))}
         </div>
-        <Button variant="outline" size="icon">
+        <Button variant="outline" size="icon" onClick={fetchTrends}>
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
@@ -169,7 +159,16 @@ const Trends = () => {
       {/* Trend grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTrends.map((trend) => (
-          <TrendCard key={trend.name} {...trend} />
+          <TrendCard 
+            key={trend.id} 
+            name={trend.name}
+            description={trend.description || ''}
+            velocityScore={trend.velocity_score}
+            shelfLife={trend.shelf_life || 'Unknown'}
+            aiSuitability={trend.ai_suitability_score}
+            category={trend.category || 'General'}
+            isHot={trend.is_hot}
+          />
         ))}
       </div>
 
