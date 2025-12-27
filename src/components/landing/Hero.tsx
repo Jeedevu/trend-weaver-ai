@@ -1,70 +1,61 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Zap, TrendingUp, Shield } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export function Hero() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-grid opacity-30" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
-
-      <div className="relative z-10 container mx-auto px-4 py-20 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8 animate-fade-in">
-          <span className="status-dot-success" />
-          <span className="text-sm font-medium text-primary">
-            Production-Ready SaaS
-          </span>
-        </div>
-
+    <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden pt-24 pb-12">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background" />
+      
+      <div className="relative z-10 container mx-auto px-4 text-center">
         {/* Headline */}
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 animate-slide-up">
-          Automate{" "}
-          <span className="gradient-text">Short-Form</span>
+          <span className="gradient-text">Faceless Videos</span> on
           <br />
-          Video Creation
+          Auto-Pilot.
         </h1>
 
         {/* Subheadline */}
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-          Detect emerging trends, generate AI-powered scripts, and safely publish 
-          to YouTube Shorts. Built for reliability, not hype.
+          Our powerful AI video creation platform allows you to fully automate a 
+          faceless channel. Get views and grow while you sleep.
         </p>
 
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        {/* CTA */}
+        <div className="flex flex-col items-center gap-3 mb-8 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <Button 
             variant="hero" 
             size="xl" 
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/dashboard/series")}
+            className="text-lg px-10 py-6"
           >
-            Start Creating
-            <ArrowRight className="h-5 w-5" />
+            Try AutoShorts.ai for Free
+            <ArrowRight className="h-5 w-5 ml-2" />
           </Button>
-          <Button variant="outline" size="xl">
-            <Play className="h-5 w-5" />
-            Watch Demo
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            (No credit card required)
+          </p>
         </div>
 
-        {/* Trust indicators */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto animate-slide-up" style={{ animationDelay: "0.3s" }}>
-          <div className="flex items-center justify-center gap-3 p-4 rounded-xl bg-secondary/50 border border-border/50">
-            <Zap className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium">Template-Driven</span>
-          </div>
-          <div className="flex items-center justify-center gap-3 p-4 rounded-xl bg-secondary/50 border border-border/50">
-            <TrendingUp className="h-5 w-5 text-success" />
-            <span className="text-sm font-medium">Real-Time Trends</span>
-          </div>
-          <div className="flex items-center justify-center gap-3 p-4 rounded-xl bg-secondary/50 border border-border/50">
-            <Shield className="h-5 w-5 text-warning" />
-            <span className="text-sm font-medium">Platform Safe</span>
-          </div>
+        {/* Squiggle arrow pointing down */}
+        <div className="flex justify-center mb-8 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+          <svg 
+            className="w-12 h-16 text-muted-foreground/50 squiggle-arrow"
+            viewBox="0 0 50 70" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path 
+              d="M25 5C25 5 15 20 25 25C35 30 20 40 25 50C30 60 25 65 25 65M25 65L20 55M25 65L30 55" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
       </div>
     </section>

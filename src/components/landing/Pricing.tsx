@@ -1,133 +1,205 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Check, Sparkles } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 const plans = [
   {
-    name: "Starter",
-    price: "29",
-    description: "For individual creators getting started",
+    name: "FREE",
+    price: "0",
+    yearlyPrice: "0",
+    highlight: "Creates 1 video",
     features: [
-      "1 video per day",
-      "1 YouTube channel",
-      "Basic trend detection",
-      "5 script templates",
-      "Standard processing",
-      "Email support",
+      { name: "1 Series", included: true },
+      { name: "Auto-post to channel", included: true },
+      { name: "Edit & preview videos", included: true },
+      { name: "HD Video Resolution", included: true },
+      { name: "Background Music", included: false },
+      { name: "Voice Cloning", included: false },
+      { name: "No Watermark", included: false },
     ],
-    cta: "Start Free Trial",
+    cta: "Temporarily paused",
+    disabled: true,
     popular: false,
   },
   {
-    name: "Pro",
-    price: "79",
-    description: "For serious creators scaling content",
+    name: "STARTER",
+    price: "19",
+    yearlyPrice: "13",
+    highlight: "Posts 3 times a week",
     features: [
-      "3 videos per day",
-      "1 YouTube channel",
-      "Advanced trend intelligence",
-      "Unlimited script templates",
-      "Priority processing",
-      "Custom voice personas",
-      "Analytics dashboard",
-      "Priority support",
+      { name: "1 Series", included: true },
+      { name: "Auto-post to channel", included: true },
+      { name: "Edit & preview videos", included: true },
+      { name: "HD Video Resolution", included: true },
+      { name: "Background Music", included: true },
+      { name: "Voice Cloning", included: true },
+      { name: "No Watermark", included: true },
     ],
-    cta: "Start Free Trial",
+    cta: "Try Now!",
+    disabled: false,
+    popular: false,
+  },
+  {
+    name: "DAILY",
+    price: "39",
+    yearlyPrice: "27",
+    highlight: "Posts once a day",
+    features: [
+      { name: "1 Series", included: true },
+      { name: "Auto-post to channel", included: true },
+      { name: "Edit & preview videos", included: true },
+      { name: "HD Video Resolution", included: true },
+      { name: "Background Music", included: true },
+      { name: "Voice Cloning", included: true },
+      { name: "No Watermark", included: true },
+    ],
+    cta: "Try Now!",
+    disabled: false,
     popular: true,
   },
   {
-    name: "Agency",
-    price: "199",
-    description: "For agencies managing multiple brands",
+    name: "HARDCORE",
+    price: "69",
+    yearlyPrice: "48",
+    highlight: "Posts twice a day",
     features: [
-      "10 videos per day",
-      "5 YouTube channels",
-      "White-label options",
-      "Team collaboration",
-      "API access",
-      "Dedicated account manager",
-      "Custom integrations",
-      "SLA guarantee",
+      { name: "1 Series", included: true },
+      { name: "Auto-post to channel", included: true },
+      { name: "Edit & preview videos", included: true },
+      { name: "HD Video Resolution", included: true },
+      { name: "Background Music", included: true },
+      { name: "Voice Cloning", included: true },
+      { name: "No Watermark", included: true },
     ],
-    cta: "Contact Sales",
+    cta: "Try Now!",
+    disabled: false,
     popular: false,
   },
 ];
 
 export function Pricing() {
+  const [isYearly, setIsYearly] = useState(false);
+  const navigate = useNavigate();
+
   return (
-    <section className="py-24 relative" id="pricing">
+    <section className="py-24 bg-secondary/30" id="pricing">
       <div className="container mx-auto px-4">
         {/* Section header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border mb-6">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Simple Pricing</span>
-          </div>
-          <h2 className="text-4xl font-bold mb-4">
-            Choose Your <span className="gradient-text">Plan</span>
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Hard-enforced limits. No surprises. Scale when you're ready.
+        <div className="text-center mb-12">
+          <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">
+            PRICING
           </p>
+          <h2 className="text-4xl font-bold mb-8">
+            PAY FOR WHAT YOU NEED
+          </h2>
+
+          {/* Toggle */}
+          <div className="flex items-center justify-center gap-4">
+            <span className={cn(
+              "font-medium transition-colors",
+              !isYearly ? "text-foreground" : "text-muted-foreground"
+            )}>
+              Monthly
+            </span>
+            <button
+              onClick={() => setIsYearly(!isYearly)}
+              className={cn(
+                "relative w-14 h-8 rounded-full transition-colors",
+                isYearly ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform",
+                  isYearly ? "translate-x-7" : "translate-x-1"
+                )}
+              />
+            </button>
+            <span className={cn(
+              "font-medium transition-colors",
+              isYearly ? "text-foreground" : "text-muted-foreground"
+            )}>
+              Yearly
+            </span>
+            {isYearly && (
+              <span className="px-3 py-1 text-sm font-semibold text-primary-foreground bg-gradient-to-r from-primary to-accent rounded-full">
+                5 months free!
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Pricing grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan) => (
             <div
               key={plan.name}
               className={cn(
-                "relative rounded-2xl p-8 transition-all duration-300",
+                "relative rounded-2xl p-6 bg-card border transition-all duration-300",
                 plan.popular
-                  ? "bg-gradient-to-b from-primary/10 to-card border-2 border-primary/50 scale-105 shadow-xl shadow-primary/10"
-                  : "card-elevated hover:border-primary/30"
+                  ? "border-primary shadow-xl shadow-primary/10 scale-105 z-10"
+                  : "border-border hover:border-primary/30"
               )}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                  Most Popular
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground text-xs font-semibold">
+                  MOST POPULAR
                 </div>
               )}
 
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
-              </div>
-
-              <div className="mb-6">
-                <span className="text-5xl font-bold">${plan.price}</span>
+              {/* Plan name */}
+              <h3 className="text-xl font-bold mb-2 text-center">{plan.name}</h3>
+              
+              {/* Price */}
+              <div className="text-center mb-4">
+                <span className="text-5xl font-bold">${isYearly ? plan.yearlyPrice : plan.price}</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
 
-              <ul className="space-y-3 mb-8">
+              {/* Highlight */}
+              <p className="text-center text-sm text-muted-foreground mb-6">
+                {plan.highlight.split(/(\d+)/g).map((part, i) => (
+                  part.match(/\d+/) ? <strong key={i} className="text-foreground">{part}</strong> : part
+                ))}
+              </p>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-6">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <Check className="h-3 w-3 text-primary" />
-                    </div>
-                    <span className="text-sm">{feature}</span>
+                  <li key={feature.name} className="flex items-center gap-3">
+                    {feature.included ? (
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <Check className="h-3 w-3 text-primary" />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <X className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className={cn(
+                      "text-sm",
+                      !feature.included && "text-muted-foreground"
+                    )}>
+                      {feature.name}
+                    </span>
                   </li>
                 ))}
               </ul>
 
+              {/* CTA */}
               <Button
-                variant={plan.popular ? "hero" : "outline"}
+                variant={plan.popular ? "hero" : plan.disabled ? "outline" : "gradient"}
                 className="w-full"
-                size="lg"
+                disabled={plan.disabled}
+                onClick={() => !plan.disabled && navigate("/auth")}
               >
                 {plan.cta}
               </Button>
             </div>
           ))}
         </div>
-
-        {/* Trust note */}
-        <p className="text-center text-sm text-muted-foreground mt-12">
-          All plans include 7-day free trial. No credit card required. 
-          <br />
-          Platform compliance is user responsibility per our TOS.
-        </p>
       </div>
     </section>
   );
