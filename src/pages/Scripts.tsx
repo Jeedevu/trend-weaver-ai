@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { 
   FileText, 
   Sparkles, 
@@ -10,46 +13,141 @@ import {
   Check,
   AlertCircle,
   Mic,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const scriptTemplates = [
-  { id: "hook-fact", name: "Hook + Fact", description: "Start with question, deliver surprising answer" },
-  { id: "pov-reveal", name: "POV Reveal", description: "First person perspective with dramatic reveal" },
-  { id: "comparison", name: "This vs That", description: "Quick comparison with clear winner" },
-  { id: "countdown", name: "Countdown", description: "Top 3 or 5 with quick transitions" },
-];
+interface ScriptTemplate {
+  id: string;
+  name: string;
+  description: string;
+}
 
-const generatedScripts = [
-  {
-    id: 1,
-    content: "Did you know the ocean produces more oxygen than all the rainforests combined? It's true. Phytoplankton generate over 50% of Earth's oxygen. So next time you breathe, thank the ocean.",
-    wordCount: 34,
-    template: "Hook + Fact",
-    hookTime: "0-2s",
-    status: "approved",
-  },
-  {
-    id: 2,
-    content: "POV: You just learned that honey never expires. Archaeologists found 3000-year-old honey in Egyptian tombs. Still perfectly edible. Nature's only food that lasts forever.",
-    wordCount: 31,
-    template: "POV Reveal",
-    hookTime: "0-2s",
-    status: "pending",
-  },
-];
+interface GeneratedScript {
+  id: string;
+  content: string;
+  word_count: number;
+  hook_text: string | null;
+  status: string;
+  created_at: string;
+}
 
 const Scripts = () => {
-  const [selectedTemplate, setSelectedTemplate] = useState("hook-fact");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [templates, setTemplates] = useState<ScriptTemplate[]>([]);
+  const [scripts, setScripts] = useState<GeneratedScript[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("hook_fact");
   const [topic, setTopic] = useState("");
-  const [copied, setCopied] = useState<number | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleCopy = (id: number, content: string) => {
+  useEffect(() => {
+    fetchData();
+  }, [user]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch templates
+      const { data: templatesData, error: templatesError } = await supabase
+        .from('script_templates')
+        .select('id, name, description');
+
+      if (templatesError) throw templatesError;
+      setTemplates(templatesData || []);
+
+      // Fetch user's scripts
+      if (user) {
+        const { data: scriptsData, error: scriptsError } = await supabase
+          .from('scripts')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (scriptsError) throw scriptsError;
+        setScripts(scriptsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Topic required",
+        description: "Please enter a topic or fact for the script.",
+      });
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('generate-script', {
+        body: { topic, template: selectedTemplate },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Save to database
+      const { data: savedScript, error: saveError } = await supabase
+        .from('scripts')
+        .insert({
+          user_id: user?.id,
+          content: data.content,
+          word_count: data.wordCount,
+          hook_text: data.hookText,
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+
+      setScripts([savedScript, ...scripts]);
+      setTopic("");
+      
+      toast({
+        title: "Script generated!",
+        description: `${data.wordCount} words, ready for review.`,
+      });
+    } catch (error: any) {
+      console.error('Error generating script:', error);
+      toast({
+        variant: "destructive",
+        title: "Generation failed",
+        description: error.message || "Please try again.",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopy = (id: string, content: string) => {
     navigator.clipboard.writeText(content);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,19 +197,18 @@ const Scripts = () => {
           <div className="space-y-2">
             <label className="text-sm font-medium">Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {scriptTemplates.map((template) => (
+              {templates.map((template) => (
                 <button
                   key={template.id}
-                  onClick={() => setSelectedTemplate(template.id)}
+                  onClick={() => setSelectedTemplate(template.name)}
                   className={cn(
                     "p-3 rounded-lg text-left transition-all border",
-                    selectedTemplate === template.id
+                    selectedTemplate === template.name
                       ? "bg-primary/10 border-primary/50"
                       : "bg-secondary/30 border-border/50 hover:bg-secondary/50"
                   )}
                 >
-                  <p className="font-medium text-sm">{template.name}</p>
-                  <p className="text-xs text-muted-foreground">{template.description}</p>
+                  <p className="font-medium text-sm">{template.description}</p>
                 </button>
               ))}
             </div>
@@ -128,9 +225,18 @@ const Scripts = () => {
             />
           </div>
 
-          <Button variant="gradient" className="w-full">
-            <Sparkles className="h-4 w-4" />
-            Generate Script
+          <Button 
+            variant="gradient" 
+            className="w-full" 
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {generating ? "Generating..." : "Generate Script"}
           </Button>
         </div>
 
@@ -138,11 +244,11 @@ const Scripts = () => {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Generated Scripts</h2>
           
-          <div className="space-y-4">
-            {generatedScripts.map((script) => (
+          <div className="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin">
+            {scripts.map((script) => (
               <div key={script.id} className="card-elevated p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary">{script.template}</Badge>
+                  <Badge variant="secondary">Script</Badge>
                   <Badge 
                     variant={script.status === "approved" ? "default" : "outline"}
                     className={script.status === "approved" ? "bg-success/20 text-success" : ""}
@@ -157,15 +263,11 @@ const Scripts = () => {
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <FileText className="h-3 w-3" />
-                      {script.wordCount} words
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Hook: {script.hookTime}
+                      {script.word_count} words
                     </span>
                     <span className="flex items-center gap-1">
                       <Mic className="h-3 w-3" />
-                      ~{Math.round(script.wordCount / 2.5)}s read
+                      ~{Math.round(script.word_count / 2.5)}s read
                     </span>
                   </div>
                   
@@ -181,13 +283,15 @@ const Scripts = () => {
                         <Copy className="h-4 w-4" />
                       )}
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               </div>
             ))}
+            {scripts.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No scripts yet. Generate your first one!
+              </div>
+            )}
           </div>
         </div>
       </div>

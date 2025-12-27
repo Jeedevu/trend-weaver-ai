@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   TrendingUp,
   Video,
@@ -12,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +29,11 @@ const navigation = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <aside
@@ -81,9 +88,20 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Upgrade CTA */}
-      {!collapsed && (
-        <div className="absolute bottom-4 left-3 right-3">
+      {/* Bottom section */}
+      <div className="absolute bottom-4 left-3 right-3 space-y-3">
+        {/* Logout button */}
+        <Button
+          variant="ghost"
+          className={cn("w-full justify-start text-muted-foreground hover:text-destructive", collapsed && "justify-center")}
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5" />
+          {!collapsed && <span className="ml-3">Log Out</span>}
+        </Button>
+
+        {/* Upgrade CTA */}
+        {!collapsed && (
           <div className="rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 p-4 border border-primary/20">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -96,8 +114,8 @@ export function Sidebar() {
               Upgrade Now
             </Button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
   );
 }
