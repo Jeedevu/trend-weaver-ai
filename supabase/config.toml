@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.check-video-status]
 verify_jwt = true
+
+[functions.youtube-auth]
+verify_jwt = false
+
+[functions.youtube-upload]
+verify_jwt = true
