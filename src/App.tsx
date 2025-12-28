@@ -14,6 +14,7 @@ import Scripts from "./pages/Scripts";
 import Videos from "./pages/Videos";
 import Queue from "./pages/Queue";
 import Settings from "./pages/Settings";
+import Series from "./pages/Series";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
                 <Route index element={<Dashboard />} />
                 <Route path="trends" element={<Trends />} />
                 <Route path="scripts" element={<Scripts />} />
+                <Route path="series" element={<Series />} />
                 <Route path="videos" element={<Videos />} />
                 <Route path="queue" element={<Queue />} />
                 <Route path="settings" element={<Settings />} />

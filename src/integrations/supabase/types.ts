@@ -179,6 +179,63 @@ export type Database = {
           },
         ]
       }
+      series: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          next_video_at: string | null
+          platforms: Json
+          posting_frequency: string
+          posting_time: string
+          prompt_template: string | null
+          status: Database["public"]["Enums"]["series_status"]
+          topic: string
+          updated_at: string
+          user_id: string
+          videos_created: number
+          visual_style: string
+          voice_persona: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          next_video_at?: string | null
+          platforms?: Json
+          posting_frequency?: string
+          posting_time?: string
+          prompt_template?: string | null
+          status?: Database["public"]["Enums"]["series_status"]
+          topic: string
+          updated_at?: string
+          user_id: string
+          videos_created?: number
+          visual_style?: string
+          voice_persona?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          next_video_at?: string | null
+          platforms?: Json
+          posting_frequency?: string
+          posting_time?: string
+          prompt_template?: string | null
+          status?: Database["public"]["Enums"]["series_status"]
+          topic?: string
+          updated_at?: string
+          user_id?: string
+          videos_created?: number
+          visual_style?: string
+          voice_persona?: string
+        }
+        Relationships: []
+      }
       trends: {
         Row: {
           ai_suitability_score: number
@@ -366,6 +423,7 @@ export type Database = {
       }
     }
     Enums: {
+      series_status: "active" | "paused" | "completed"
       subscription_tier: "starter" | "pro" | "agency"
       trend_status: "active" | "declining" | "expired"
       video_status:
@@ -504,6 +562,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      series_status: ["active", "paused", "completed"],
       subscription_tier: ["starter", "pro", "agency"],
       trend_status: ["active", "declining", "expired"],
       video_status: [

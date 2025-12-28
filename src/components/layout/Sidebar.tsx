@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Trends", href: "/dashboard/trends", icon: TrendingUp },
   { name: "Scripts", href: "/dashboard/scripts", icon: FileText },
+  { name: "Series", href: "/dashboard/series", icon: Layers },
   { name: "Videos", href: "/dashboard/videos", icon: Video },
   { name: "Queue", href: "/dashboard/queue", icon: Upload },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
