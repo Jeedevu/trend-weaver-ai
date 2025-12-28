@@ -15,6 +15,9 @@ interface VideoRequest {
   visual_style: string;
   voice_persona: string;
   series_id?: string;
+  user_id?: string; // For automation (when called without user token)
+  youtube_title?: string;
+  youtube_description?: string;
 }
 
 // Map visual styles to JSON2Video compatible settings
@@ -90,31 +93,41 @@ serve(async (req) => {
       );
     }
 
-    // Verify user token ourselves (since platform JWT verification is disabled)
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Parse request body first to check for automation mode
+    const body: VideoRequest = await req.json();
+    const { script, title, visual_style, voice_persona, series_id, user_id: providedUserId, youtube_title, youtube_description } = body;
 
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser();
+    let userId: string;
 
-    if (authError || !user) {
-      console.error("Auth error:", authError?.message || "No user found");
-      return new Response(
-        JSON.stringify({ error: "Invalid auth token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // If user_id is provided (automation mode with service key), use it directly
+    if (providedUserId && authHeader.includes(supabaseServiceKey!.substring(0, 20))) {
+      userId = providedUserId;
+      console.log(`Automation mode: using provided user_id ${userId}`);
+    } else {
+      // Verify user token ourselves (since platform JWT verification is disabled)
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const {
+        data: { user },
+        error: authError,
+      } = await authClient.auth.getUser();
+
+      if (authError || !user) {
+        console.error("Auth error:", authError?.message || "No user found");
+        return new Response(
+          JSON.stringify({ error: "Invalid auth token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      userId = user.id;
     }
 
     // Create service role client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body: VideoRequest = await req.json();
-    const { script, title, visual_style, voice_persona, series_id } = body;
-
-    console.log(`Generating video for user ${user.id}: "${title}"`);
+    console.log(`Generating video for user ${userId}: "${title}"`);
 
     // Get visual style configuration
     const styleConfig = getVisualStyleConfig(visual_style);
@@ -189,16 +202,23 @@ serve(async (req) => {
     );
 
     // Create video record in database using service role client
+    const videoRecord: Record<string, unknown> = {
+      user_id: userId,
+      title: title,
+      status: "generating",
+      visual_style: visual_style,
+      script_id: null,
+      duration_seconds: Math.round(estimatedDuration),
+    };
+
+    // Add series_id if provided (for automation)
+    if (series_id) {
+      videoRecord.series_id = series_id;
+    }
+
     const { data: video, error: insertError } = await supabase
       .from("videos")
-      .insert({
-        user_id: user.id,
-        title: title,
-        status: "generating",
-        visual_style: visual_style,
-        script_id: null,
-        duration_seconds: Math.round(estimatedDuration),
-      })
+      .insert(videoRecord)
       .select()
       .single();
 
