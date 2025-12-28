@@ -34,15 +34,15 @@ function getVisualStyleConfig(style: string) {
   return styles[style] || styles.dark_minimal;
 }
 
-// Map voice personas to ElevenLabs-compatible voice IDs
-function getVoiceId(persona: string): string {
+// Map voice personas to Azure voice IDs (free with JSON2Video)
+function getAzureVoice(persona: string): string {
   const voices: Record<string, string> = {
-    professional_male: "ErXwobaYiN019PkySvjV", // Antoni
-    professional_female: "EXAVITQu4vr4xnSDxMaL", // Bella
-    energetic_male: "VR6AewLTigWG4xSOukaG", // Arnold
-    energetic_female: "jBpfuIE2acCO8z3wKNLl", // Gigi
-    calm_narrator: "yoZ06aMxZJJ28mfd3POQ", // Sam
-    dramatic: "GBv7mTt0atIp3Br8iCZE", // Thomas
+    professional_male: "en-US-GuyNeural",
+    professional_female: "en-US-JennyNeural",
+    energetic_male: "en-US-DavisNeural",
+    energetic_female: "en-US-AriaNeural",
+    calm_narrator: "en-US-ChristopherNeural",
+    dramatic: "en-GB-RyanNeural",
   };
   return voices[persona] || voices.professional_male;
 }
@@ -66,28 +66,38 @@ serve(async (req) => {
     // Get auth token from request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: "Authorization required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Initialize Supabase client
+    // Extract the token from Bearer scheme
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Initialize Supabase client with service role for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    
+    // Create a client for user verification
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Verify user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Verify user with the auth client
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
     if (authError || !user) {
-      console.error("Auth error:", authError);
+      console.error("Auth error:", authError?.message || "No user found");
       return new Response(
         JSON.stringify({ error: "Invalid auth token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Create service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: VideoRequest = await req.json();
     const { script, title, visual_style, voice_persona, series_id } = body;
@@ -96,51 +106,46 @@ serve(async (req) => {
 
     // Get visual style configuration
     const styleConfig = getVisualStyleConfig(visual_style);
-    const voiceId = getVoiceId(voice_persona);
+    const voiceName = getAzureVoice(voice_persona);
 
     // Split script into sentences for scene generation
     const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
     
-    // Build JSON2Video payload
+    // Build JSON2Video payload using correct API schema
     const moviePayload = {
-      resolution: "custom",
-      width: 1080,
-      height: 1920,
+      resolution: "instagram-story", // 1080x1920 for vertical video (Shorts)
       quality: "high",
-      fps: 30,
       scenes: sentences.map((sentence, index) => ({
-        duration: Math.max(3, sentence.trim().split(" ").length * 0.5), // ~0.5 sec per word, min 3 sec
-        background: styleConfig.backgroundColor,
+        "background-color": styleConfig.backgroundColor,
+        duration: -1, // Auto-calculate based on voice duration
         elements: [
-          // Text element
+          // Text element with settings object
           {
             type: "text",
             text: sentence.trim(),
-            x: 540,
-            y: 960,
-            width: 900,
-            height: 400,
-            align: "center",
-            font: styleConfig.font,
-            fontSize: 48,
-            color: styleConfig.textColor,
-            animation: {
-              type: index % 2 === 0 ? "fadeIn" : "slideUp",
-              duration: 0.5,
+            duration: -2, // Match scene duration
+            settings: {
+              "font-family": styleConfig.font,
+              "font-size": "48px",
+              "font-color": styleConfig.textColor,
+              "text-align": "center",
+              "vertical-align": "middle",
+              padding: "40px",
             },
           },
-          // Voice narration
+          // Voice narration using Azure (free)
           {
             type: "voice",
             text: sentence.trim(),
-            voice: voiceId,
-            provider: "elevenlabs",
+            voice: voiceName,
+            model: "azure",
           },
         ],
       })),
     };
 
     console.log("Sending request to JSON2Video API...");
+    console.log("Payload:", JSON.stringify(moviePayload, null, 2));
 
     // Submit video to JSON2Video
     const createResponse = await fetch(`${JSON2VIDEO_BASE_URL}/movies`, {
@@ -166,7 +171,12 @@ serve(async (req) => {
     const projectId = createData.project;
     console.log(`Video job created with project ID: ${projectId}`);
 
-    // Create video record in database
+    // Estimate duration (~3 sec per sentence minimum)
+    const estimatedDuration = sentences.reduce((acc, s) => 
+      acc + Math.max(3, s.trim().split(" ").length * 0.4), 0
+    );
+
+    // Create video record in database using service role client
     const { data: video, error: insertError } = await supabase
       .from("videos")
       .insert({
@@ -174,8 +184,8 @@ serve(async (req) => {
         title: title,
         status: "generating",
         visual_style: visual_style,
-        script_id: null, // Will be linked if from a script
-        duration_seconds: sentences.reduce((acc, s) => acc + Math.max(3, s.trim().split(" ").length * 0.5), 0),
+        script_id: null,
+        duration_seconds: Math.round(estimatedDuration),
       })
       .select()
       .single();
@@ -183,7 +193,7 @@ serve(async (req) => {
     if (insertError) {
       console.error("Error inserting video:", insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to create video record" }),
+        JSON.stringify({ error: "Failed to create video record", details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
