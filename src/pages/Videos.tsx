@@ -33,6 +33,8 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
+  ExternalLink,
+  Youtube,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,7 @@ interface GeneratedVideo {
   thumbnail_url: string | null;
   visual_style: string;
   error_message: string | null;
+  youtube_video_id: string | null;
 }
 
 const VISUAL_STYLES = [
@@ -233,6 +236,60 @@ const Videos = () => {
         description: "Failed to delete video",
         variant: "destructive",
       });
+    }
+  };
+
+  const publishToYouTube = async (video: GeneratedVideo) => {
+    // Check if YouTube is connected
+    const accessToken = localStorage.getItem("youtube_access_token");
+    const refreshToken = localStorage.getItem("youtube_refresh_token");
+
+    if (!accessToken) {
+      toast({
+        title: "YouTube Not Connected",
+        description: "Please connect your YouTube account in Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update UI optimistically
+      setVideos(prev => prev.map(v => 
+        v.id === video.id ? { ...v, status: "publishing" as VideoStatus } : v
+      ));
+
+      const { data, error } = await supabase.functions.invoke("youtube-upload", {
+        body: {
+          video_id: video.id,
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          title: video.title,
+          description: `Generated with AI • ${video.visual_style} style`,
+          tags: ["shorts", "ai", "generated"],
+          privacy_status: "public",
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({ 
+          title: "Published to YouTube!", 
+          description: `Watch at youtube.com/shorts/${data.youtube_video_id}` 
+        });
+        fetchVideos();
+      } else {
+        throw new Error(data.error || "Failed to publish");
+      }
+    } catch (error) {
+      console.error("Error publishing to YouTube:", error);
+      toast({
+        title: "Publishing Failed",
+        description: error instanceof Error ? error.message : "Failed to publish to YouTube",
+        variant: "destructive",
+      });
+      fetchVideos(); // Refresh to get actual status
     }
   };
 
@@ -479,8 +536,13 @@ const Videos = () => {
 
                 {video.status === "ready" && video.video_url && (
                   <div className="flex gap-2 pt-2">
-                    <Button variant="gradient" size="sm" className="flex-1">
-                      Schedule
+                    <Button 
+                      variant="gradient" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => publishToYouTube(video)}
+                    >
+                      Publish to YouTube
                     </Button>
                     <Button
                       variant="outline"
@@ -488,6 +550,25 @@ const Videos = () => {
                       onClick={() => window.open(video.video_url!, "_blank")}
                     >
                       <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {video.status === "publishing" && (
+                  <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Publishing to YouTube...
+                  </div>
+                )}
+                {video.status === "published" && video.youtube_video_id && (
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => window.open(`https://youtube.com/shorts/${video.youtube_video_id}`, "_blank")}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View on YouTube
                     </Button>
                   </div>
                 )}
