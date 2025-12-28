@@ -59,9 +59,12 @@ export type Database = {
           updated_at: string
           videos_created_today: number
           voice_persona: string | null
+          youtube_access_token: string | null
           youtube_channel_id: string | null
           youtube_channel_name: string | null
           youtube_connected: boolean
+          youtube_refresh_token: string | null
+          youtube_token_expires_at: string | null
         }
         Insert: {
           created_at?: string
@@ -74,9 +77,12 @@ export type Database = {
           updated_at?: string
           videos_created_today?: number
           voice_persona?: string | null
+          youtube_access_token?: string | null
           youtube_channel_id?: string | null
           youtube_channel_name?: string | null
           youtube_connected?: boolean
+          youtube_refresh_token?: string | null
+          youtube_token_expires_at?: string | null
         }
         Update: {
           created_at?: string
@@ -89,9 +95,12 @@ export type Database = {
           updated_at?: string
           videos_created_today?: number
           voice_persona?: string | null
+          youtube_access_token?: string | null
           youtube_channel_id?: string | null
           youtube_channel_name?: string | null
           youtube_connected?: boolean
+          youtube_refresh_token?: string | null
+          youtube_token_expires_at?: string | null
         }
         Relationships: []
       }
@@ -181,15 +190,20 @@ export type Database = {
       }
       series: {
         Row: {
+          aspect_ratio: string | null
           created_at: string
           description: string | null
+          duration_preference: string | null
           id: string
+          language: string | null
+          last_video_generated_at: string | null
           name: string
           next_video_at: string | null
           platforms: Json
           posting_frequency: string
           posting_time: string
           prompt_template: string | null
+          series_id: string | null
           status: Database["public"]["Enums"]["series_status"]
           topic: string
           updated_at: string
@@ -199,15 +213,20 @@ export type Database = {
           voice_persona: string
         }
         Insert: {
+          aspect_ratio?: string | null
           created_at?: string
           description?: string | null
+          duration_preference?: string | null
           id?: string
+          language?: string | null
+          last_video_generated_at?: string | null
           name: string
           next_video_at?: string | null
           platforms?: Json
           posting_frequency?: string
           posting_time?: string
           prompt_template?: string | null
+          series_id?: string | null
           status?: Database["public"]["Enums"]["series_status"]
           topic: string
           updated_at?: string
@@ -217,15 +236,20 @@ export type Database = {
           voice_persona?: string
         }
         Update: {
+          aspect_ratio?: string | null
           created_at?: string
           description?: string | null
+          duration_preference?: string | null
           id?: string
+          language?: string | null
+          last_video_generated_at?: string | null
           name?: string
           next_video_at?: string | null
           platforms?: Json
           posting_frequency?: string
           posting_time?: string
           prompt_template?: string | null
+          series_id?: string | null
           status?: Database["public"]["Enums"]["series_status"]
           topic?: string
           updated_at?: string
@@ -347,6 +371,7 @@ export type Database = {
           retry_count: number
           scheduled_at: string | null
           script_id: string | null
+          series_id: string | null
           status: Database["public"]["Enums"]["video_status"]
           thumbnail_url: string | null
           title: string
@@ -366,6 +391,7 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           script_id?: string | null
+          series_id?: string | null
           status?: Database["public"]["Enums"]["video_status"]
           thumbnail_url?: string | null
           title: string
@@ -385,6 +411,7 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           script_id?: string | null
+          series_id?: string | null
           status?: Database["public"]["Enums"]["video_status"]
           thumbnail_url?: string | null
           title?: string
@@ -401,6 +428,13 @@ export type Database = {
             columns: ["script_id"]
             isOneToOne: false
             referencedRelation: "scripts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videos_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
             referencedColumns: ["id"]
           },
           {

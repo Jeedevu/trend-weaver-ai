@@ -20,3 +20,12 @@ verify_jwt = true
 
 [functions.voice-preview]
 verify_jwt = false
+
+[functions.generate-trending-content]
+verify_jwt = false
+
+[functions.process-series]
+verify_jwt = false
+
+[functions.auto-publish]
+verify_jwt = false
