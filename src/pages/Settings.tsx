@@ -57,11 +57,9 @@ const Settings = () => {
           // Exchange code for tokens
           const { data, error } = await supabase.functions.invoke("youtube-auth", {
             body: { 
+              action: "exchange-code",
               code, 
               redirect_uri: `${window.location.origin}/dashboard/settings` 
-            },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
             },
           });
 
@@ -126,10 +124,8 @@ const Settings = () => {
 
       const { data, error } = await supabase.functions.invoke("youtube-auth", {
         body: { 
+          action: "get-auth-url",
           redirect_uri: `${window.location.origin}/dashboard/settings` 
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -160,10 +156,7 @@ const Settings = () => {
       if (!session) throw new Error("Not authenticated");
 
       const { error } = await supabase.functions.invoke("youtube-auth", {
-        body: {},
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        body: { action: "disconnect" },
       });
 
       if (error) throw error;

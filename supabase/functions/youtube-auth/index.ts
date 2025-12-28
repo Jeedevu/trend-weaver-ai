@@ -15,11 +15,12 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const action = url.searchParams.get("action");
-
-    // Get auth header
+    // Parse body once at the start
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || new URL(req.url).searchParams.get("action");
     const authHeader = req.headers.get("Authorization");
+    
+    console.log("YouTube auth action:", action);
     
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -34,6 +35,7 @@ serve(async (req) => {
     if (action === "get-auth-url") {
       // Generate OAuth URL for YouTube
       if (!YOUTUBE_CLIENT_ID) {
+        console.error("YOUTUBE_CLIENT_ID not configured");
         return new Response(
           JSON.stringify({ error: "YouTube OAuth not configured" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -44,14 +46,13 @@ serve(async (req) => {
       const token = authHeader?.replace("Bearer ", "") || "";
       const { data: { user }, error: authError } = await authClient.auth.getUser(token);
       if (authError || !user) {
+        console.error("Auth error:", authError);
         return new Response(
           JSON.stringify({ error: "Not authenticated" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Get the redirect URI from the request origin
-      const body = await req.json().catch(() => ({}));
       const redirectUri = body.redirect_uri || `${supabaseUrl}/functions/v1/youtube-callback`;
 
       const scopes = [
@@ -80,8 +81,6 @@ serve(async (req) => {
     }
 
     if (action === "exchange-code") {
-      // Exchange authorization code for tokens
-      const body = await req.json();
       const { code, redirect_uri } = body;
 
       if (!code) {
@@ -141,7 +140,7 @@ serve(async (req) => {
       const channelId = channel?.id || null;
       const channelName = channel?.snippet?.title || null;
 
-      // Store tokens in profile using service role
+      // Store in profile using service role
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
       const { error: updateError } = await supabase
@@ -160,10 +159,6 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      // Store tokens securely (we'll use a separate table or vault in production)
-      // For now, we'll return success and handle tokens client-side via localStorage
-      // In production, store refresh_token in Supabase Vault or encrypted column
 
       console.log("YouTube connected successfully for user:", user.id);
 
@@ -215,8 +210,9 @@ serve(async (req) => {
       );
     }
 
+    console.log("Invalid action received:", action);
     return new Response(
-      JSON.stringify({ error: "Invalid action" }),
+      JSON.stringify({ error: "Invalid action", received: action }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
