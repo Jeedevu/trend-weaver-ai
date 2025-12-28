@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const JSON2VIDEO_API_KEY = Deno.env.get("JSON2VIDEO_API_KEY");
-const JSON2VIDEO_BASE_URL = "https://api.json2video.com/v2";
+const FAL_KEY = Deno.env.get("FAL_KEY");
+const FAL_API_URL = "https://queue.fal.run/fal-ai/sora-2/text-to-video";
 
 interface VideoRequest {
   script: string;
@@ -18,36 +18,26 @@ interface VideoRequest {
   user_id?: string; // For automation (when called without user token)
   youtube_title?: string;
   youtube_description?: string;
+  aspect_ratio?: string; // "16:9", "9:16", "1:1"
+  duration?: number; // 4, 8, 16, 20 seconds
 }
 
-// Map visual styles to JSON2Video compatible settings
-function getVisualStyleConfig(style: string) {
-  const styles: Record<string, { backgroundColor: string; textColor: string; font: string }> = {
-    dark_minimal: { backgroundColor: "#0a0a0a", textColor: "#ffffff", font: "Montserrat" },
-    minecraft: { backgroundColor: "#5d7c43", textColor: "#ffffff", font: "Press Start 2P" },
-    disney_toon: { backgroundColor: "#1a237e", textColor: "#ffd700", font: "Comic Sans MS" },
-    gtav: { backgroundColor: "#1a1a2e", textColor: "#00ff00", font: "Pricedown" },
-    comic_book: { backgroundColor: "#ffeb3b", textColor: "#000000", font: "Bangers" },
-    anime: { backgroundColor: "#ff69b4", textColor: "#ffffff", font: "Anime Ace" },
-    realistic: { backgroundColor: "#2c3e50", textColor: "#ecf0f1", font: "Roboto" },
-    retro_game: { backgroundColor: "#000000", textColor: "#00ff00", font: "VT323" },
-    watercolor: { backgroundColor: "#f5f5dc", textColor: "#2c3e50", font: "Pacifico" },
-    neon_cyber: { backgroundColor: "#0f0f23", textColor: "#00ffff", font: "Orbitron" },
+// Map visual styles to Sora prompt modifiers
+function getVisualStylePrompt(style: string): string {
+  const styles: Record<string, string> = {
+    dark_minimal: "minimalist dark aesthetic, high contrast, clean modern design",
+    minecraft: "Minecraft video game style, blocky voxel graphics, pixelated textures",
+    disney_toon: "Disney animation style, colorful cartoon, expressive characters",
+    gtav: "Grand Theft Auto V video game style, cinematic urban atmosphere, neon lights",
+    comic_book: "comic book art style, bold outlines, halftone dots, vibrant colors",
+    anime: "anime style, Japanese animation, vibrant colors, expressive",
+    realistic: "photorealistic, cinematic, high quality, detailed",
+    retro_game: "retro 8-bit pixel art style, nostalgic video game aesthetic",
+    watercolor: "watercolor painting style, soft brushstrokes, artistic",
+    neon_cyber: "cyberpunk neon style, futuristic, glowing lights, dark atmosphere",
+    autoshorts: "professional video, clean and engaging, modern social media style",
   };
-  return styles[style] || styles.dark_minimal;
-}
-
-// Map voice personas to Azure voice IDs (free with JSON2Video)
-function getAzureVoice(persona: string): string {
-  const voices: Record<string, string> = {
-    professional_male: "en-US-GuyNeural",
-    professional_female: "en-US-JennyNeural",
-    energetic_male: "en-US-DavisNeural",
-    energetic_female: "en-US-AriaNeural",
-    calm_narrator: "en-US-ChristopherNeural",
-    dramatic: "en-GB-RyanNeural",
-  };
-  return voices[persona] || voices.professional_male;
+  return styles[style] || styles.realistic;
 }
 
 serve(async (req) => {
@@ -58,8 +48,8 @@ serve(async (req) => {
 
   try {
     // Verify API key is configured
-    if (!JSON2VIDEO_API_KEY) {
-      console.error("JSON2VIDEO_API_KEY is not configured");
+    if (!FAL_KEY) {
+      console.error("FAL_KEY is not configured");
       return new Response(
         JSON.stringify({ error: "Video API not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -82,11 +72,7 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
     if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-      console.error("Missing backend env vars", {
-        hasUrl: Boolean(supabaseUrl),
-        hasServiceKey: Boolean(supabaseServiceKey),
-        hasAnonKey: Boolean(supabaseAnonKey),
-      });
+      console.error("Missing backend env vars");
       return new Response(
         JSON.stringify({ error: "Backend not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -95,7 +81,16 @@ serve(async (req) => {
 
     // Parse request body first to check for automation mode
     const body: VideoRequest = await req.json();
-    const { script, title, visual_style, voice_persona, series_id, user_id: providedUserId, youtube_title, youtube_description } = body;
+    const { 
+      script, 
+      title, 
+      visual_style, 
+      voice_persona, 
+      series_id, 
+      user_id: providedUserId,
+      aspect_ratio = "9:16", // Default to vertical for Shorts
+      duration = 8 // Default to 8 seconds
+    } = body;
 
     let userId: string;
 
@@ -129,77 +124,53 @@ serve(async (req) => {
 
     console.log(`Generating video for user ${userId}: "${title}"`);
 
-    // Get visual style configuration
-    const styleConfig = getVisualStyleConfig(visual_style);
-    const voiceName = getAzureVoice(voice_persona);
+    // Build the prompt with visual style
+    const stylePrompt = getVisualStylePrompt(visual_style);
+    const fullPrompt = `${script}. ${stylePrompt}`;
 
-    // Split script into sentences for scene generation
-    const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    
-    // Build JSON2Video payload using correct API schema
-    const moviePayload = {
-      resolution: "instagram-story", // 1080x1920 for vertical video (Shorts)
-      quality: "high",
-      scenes: sentences.map((sentence, index) => ({
-        "background-color": styleConfig.backgroundColor,
-        duration: -1, // Auto-calculate based on voice duration
-        elements: [
-          // Text element with settings object
-          {
-            type: "text",
-            text: sentence.trim(),
-            duration: -2, // Match scene duration
-            settings: {
-              "font-family": styleConfig.font,
-              "font-size": "48px",
-              "font-color": styleConfig.textColor,
-              "text-align": "center",
-              "vertical-align": "middle",
-              padding: "40px",
-            },
-          },
-          // Voice narration using Azure (free)
-          {
-            type: "voice",
-            text: sentence.trim(),
-            voice: voiceName,
-            model: "azure",
-          },
-        ],
-      })),
-    };
+    console.log("Submitting to fal.ai Sora API...");
+    console.log("Prompt:", fullPrompt);
+    console.log("Aspect ratio:", aspect_ratio);
+    console.log("Duration:", duration);
 
-    console.log("Sending request to JSON2Video API...");
-    console.log("Payload:", JSON.stringify(moviePayload, null, 2));
-
-    // Submit video to JSON2Video
-    const createResponse = await fetch(`${JSON2VIDEO_BASE_URL}/movies`, {
+    // Submit video generation request to fal.ai queue
+    const falResponse = await fetch(FAL_API_URL, {
       method: "POST",
       headers: {
-        "x-api-key": JSON2VIDEO_API_KEY,
+        "Authorization": `Key ${FAL_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(moviePayload),
+      body: JSON.stringify({
+        prompt: fullPrompt,
+        aspect_ratio: aspect_ratio,
+        duration: duration,
+        resolution: "720p",
+      }),
     });
 
-    const createData = await createResponse.json();
-    console.log("JSON2Video response:", JSON.stringify(createData));
-
-    if (!createData.success) {
-      console.error("JSON2Video error:", createData);
+    if (!falResponse.ok) {
+      const errorText = await falResponse.text();
+      console.error("fal.ai API error:", falResponse.status, errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to initiate video rendering", details: createData }),
+        JSON.stringify({ error: "Failed to initiate video rendering", details: errorText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const projectId = createData.project;
-    console.log(`Video job created with project ID: ${projectId}`);
+    const falData = await falResponse.json();
+    console.log("fal.ai response:", JSON.stringify(falData));
 
-    // Estimate duration (~3 sec per sentence minimum)
-    const estimatedDuration = sentences.reduce((acc, s) => 
-      acc + Math.max(3, s.trim().split(" ").length * 0.4), 0
-    );
+    // fal.ai returns a request_id for queue-based processing
+    const requestId = falData.request_id;
+    if (!requestId) {
+      console.error("No request_id in fal.ai response:", falData);
+      return new Response(
+        JSON.stringify({ error: "Failed to get request ID from video API" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Video job submitted with request ID: ${requestId}`);
 
     // Create video record in database using service role client
     const videoRecord: Record<string, unknown> = {
@@ -208,7 +179,7 @@ serve(async (req) => {
       status: "generating",
       visual_style: visual_style,
       script_id: null,
-      duration_seconds: Math.round(estimatedDuration),
+      duration_seconds: duration,
     };
 
     // Add series_id if provided (for automation)
@@ -232,12 +203,12 @@ serve(async (req) => {
 
     console.log(`Video record created: ${video.id}`);
 
-    // Return immediately with project ID for status polling
+    // Return immediately with request ID for status polling
     return new Response(
       JSON.stringify({
         success: true,
         video_id: video.id,
-        project_id: projectId,
+        project_id: requestId, // Using project_id for compatibility with existing frontend
         message: "Video generation started",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
