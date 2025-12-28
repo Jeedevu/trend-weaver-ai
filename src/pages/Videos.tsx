@@ -184,6 +184,17 @@ const Videos = () => {
 
     setGenerating(true);
     try {
+      // Ensure we have a valid session
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to generate videos",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-video", {
         body: {
           title: formData.title.trim(),
@@ -193,7 +204,45 @@ const Videos = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for auth errors specifically
+        if (error.message?.includes("401") || error.message?.includes("Invalid JWT")) {
+          // Try to refresh the session
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            toast({
+              title: "Authentication Error",
+              description: "Your session has expired. Please log in again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          // Retry the request
+          const { data: retryData, error: retryError } = await supabase.functions.invoke("generate-video", {
+            body: {
+              title: formData.title.trim(),
+              script: formData.script.trim(),
+              visual_style: formData.visual_style,
+              voice_persona: formData.voice_persona,
+            },
+          });
+          if (retryError) throw retryError;
+          if (retryData?.success) {
+            setPollingIds(prev => new Map(prev).set(retryData.video_id, retryData.project_id));
+            toast({ title: "Video generation started!" });
+            setDialogOpen(false);
+            setFormData({
+              title: "",
+              script: "",
+              visual_style: "dark_minimal",
+              voice_persona: "professional_male",
+            });
+            fetchVideos();
+            return;
+          }
+        }
+        throw error;
+      }
 
       if (data.success) {
         // Add to polling map

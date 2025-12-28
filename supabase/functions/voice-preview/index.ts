@@ -68,6 +68,22 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs API error:", response.status, errorText);
+      
+      // Handle specific error cases
+      if (response.status === 401) {
+        // Check if it's an abuse detection issue
+        if (errorText.includes("unusual_activity") || errorText.includes("Free Tier")) {
+          return new Response(
+            JSON.stringify({ error: "Voice service temporarily unavailable. Please try again later." }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: "Voice service authentication error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: "Failed to generate voice preview" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
