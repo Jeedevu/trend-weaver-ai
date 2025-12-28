@@ -2,17 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -28,10 +19,20 @@ import {
   Pause,
   Trash2,
   Edit,
-  Video,
-  Calendar,
   Loader2,
   Layers,
+  Youtube,
+  Mail,
+  Instagram,
+  Smartphone,
+  Lock,
+  Globe,
+  Clock,
+  Mic,
+  Image,
+  MonitorPlay,
+  Square,
+  CheckCircle2,
 } from "lucide-react";
 
 interface Series {
@@ -51,39 +52,81 @@ interface Series {
   created_at: string;
 }
 
-const VISUAL_STYLES = [
-  { id: "dark_minimal", name: "Dark Minimal", preview: "🌑" },
-  { id: "minecraft", name: "Minecraft", preview: "⛏️" },
-  { id: "disney_toon", name: "Disney Toon", preview: "🏰" },
-  { id: "gtav", name: "GTA V", preview: "🚗" },
-  { id: "comic_book", name: "Comic Book", preview: "💥" },
-  { id: "anime", name: "Anime", preview: "🎌" },
-  { id: "realistic", name: "Realistic", preview: "📸" },
-  { id: "retro_game", name: "Retro Game", preview: "👾" },
-  { id: "watercolor", name: "Watercolor", preview: "🎨" },
-  { id: "neon_cyber", name: "Neon Cyber", preview: "🌆" },
+// Content Topics
+const CONTENT_TOPICS = [
+  { id: "custom_prompt", name: "Custom Prompt", isCustom: true },
+  { id: "bible_stories", name: "Bible Stories", isNew: true },
+  { id: "random_ai_story", name: "Random AI Story" },
+  { id: "travel_destinations", name: "Travel Destinations" },
+  { id: "what_if", name: "What If?" },
+  { id: "scary_stories", name: "Scary Stories" },
+  { id: "bedtime_stories", name: "Bedtime Stories" },
+  { id: "interesting_history", name: "Interesting History" },
+  { id: "urban_legends", name: "Urban Legends" },
+  { id: "motivational", name: "Motivational" },
+  { id: "fun_facts", name: "Fun Facts" },
+  { id: "long_form_jokes", name: "Long Form Jokes" },
+  { id: "life_pro_tips", name: "Life Pro Tips" },
+  { id: "eli5", name: "ELI5" },
+  { id: "philosophy", name: "Philosophy" },
+  { id: "product_marketing", name: "Product Marketing" },
+  { id: "fake_text_message", name: "Fake Text Message" },
+  { id: "engagement_bait", name: "Engagement Bait" },
+  { id: "web_search", name: "Web Search" },
 ];
 
+// Voice options with descriptions
 const VOICE_PERSONAS = [
-  { id: "professional_male", name: "Professional Male" },
-  { id: "professional_female", name: "Professional Female" },
-  { id: "energetic_male", name: "Energetic Male" },
-  { id: "energetic_female", name: "Energetic Female" },
-  { id: "calm_narrator", name: "Calm Narrator" },
-  { id: "dramatic", name: "Dramatic" },
+  { id: "echo", name: "Echo", description: "Male, American, Excited" },
+  { id: "alloy", name: "Alloy", description: "Female, American" },
+  { id: "onyx", name: "Onyx", description: "Male, American, Slow, Deep" },
+  { id: "fable", name: "Fable", description: "Female, British" },
+  { id: "nova", name: "Nova", description: "Female, American, Warm" },
+  { id: "shimmer", name: "Shimmer", description: "Female, Soft, Gentle" },
 ];
 
-const POSTING_FREQUENCIES = [
-  { id: "hourly", name: "Every Hour" },
-  { id: "daily", name: "Daily" },
-  { id: "twice_daily", name: "Twice Daily" },
-  { id: "weekly", name: "Weekly" },
+// Art styles with preview images (using placeholder colors for now)
+const ART_STYLES = [
+  { id: "autoshorts", name: "AutoShorts", color: "from-amber-900 to-amber-700" },
+  { id: "lego", name: "Lego", color: "from-yellow-500 to-orange-500" },
+  { id: "comic_book", name: "Comic Book", color: "from-blue-600 to-purple-600" },
+  { id: "disney_toon", name: "Disney Toon", color: "from-sky-400 to-blue-500" },
+  { id: "anime", name: "Anime", color: "from-pink-500 to-purple-500" },
+  { id: "realistic", name: "Realistic", color: "from-gray-600 to-gray-800" },
+  { id: "minecraft", name: "Minecraft", color: "from-green-600 to-green-800" },
+  { id: "watercolor", name: "Watercolor", color: "from-rose-300 to-purple-300" },
 ];
 
-const PLATFORMS = [
-  { id: "youtube", name: "YouTube Shorts", icon: "📺" },
-  { id: "tiktok", name: "TikTok", icon: "🎵" },
-  { id: "instagram", name: "Instagram Reels", icon: "📷" },
+// Aspect ratios
+const ASPECT_RATIOS = [
+  { id: "9:16", name: "Vertical (9:16)", icon: Smartphone },
+  { id: "16:9", name: "Horizontal (16:9)", icon: MonitorPlay },
+  { id: "1:1", name: "Square (1:1)", icon: Square },
+];
+
+// Languages
+const LANGUAGES = [
+  { id: "en", name: "English", flag: "🇺🇸" },
+  { id: "es", name: "Spanish", flag: "🇪🇸" },
+  { id: "fr", name: "French", flag: "🇫🇷" },
+  { id: "de", name: "German", flag: "🇩🇪" },
+  { id: "pt", name: "Portuguese", flag: "🇧🇷" },
+  { id: "hi", name: "Hindi", flag: "🇮🇳" },
+];
+
+// Duration options
+const DURATIONS = [
+  { id: "30-60", name: "30 to 60 seconds" },
+  { id: "60-90", name: "60 to 90 seconds" },
+  { id: "90-120", name: "90 to 120 seconds" },
+];
+
+// Destinations
+const DESTINATIONS = [
+  { id: "email", name: "Email Me Instead", icon: Mail, available: true },
+  { id: "youtube", name: "Link a YouTube Account +", icon: Youtube, available: false },
+  { id: "tiktok", name: "Link a TikTok Account +", icon: Smartphone, available: false },
+  { id: "instagram", name: "Link an Instagram Account +", icon: Instagram, available: false },
 ];
 
 export default function Series() {
@@ -91,21 +134,19 @@ export default function Series() {
   const { toast } = useToast();
   const [series, setSeries] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingSeries, setEditingSeries] = useState<Series | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showCreator, setShowCreator] = useState(false);
+  const [editingSeries, setEditingSeries] = useState<Series | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    topic: "",
-    prompt_template: "",
-    visual_style: "dark_minimal",
-    voice_persona: "professional_male",
-    posting_frequency: "daily",
-    posting_time: "12:00",
-    platforms: ["youtube"] as string[],
+    destination: "email",
+    topic: "bedtime_stories",
+    voice_persona: "echo",
+    art_style: "autoshorts",
+    aspect_ratio: "9:16",
+    language: "en",
+    duration: "60-90",
   });
 
   useEffect(() => {
@@ -137,57 +178,31 @@ export default function Series() {
 
   const resetForm = () => {
     setFormData({
-      name: "",
-      description: "",
-      topic: "",
-      prompt_template: "",
-      visual_style: "dark_minimal",
-      voice_persona: "professional_male",
-      posting_frequency: "daily",
-      posting_time: "12:00",
-      platforms: ["youtube"],
+      destination: "email",
+      topic: "bedtime_stories",
+      voice_persona: "echo",
+      art_style: "autoshorts",
+      aspect_ratio: "9:16",
+      language: "en",
+      duration: "60-90",
     });
     setEditingSeries(null);
-  };
-
-  const openEditDialog = (s: Series) => {
-    setEditingSeries(s);
-    setFormData({
-      name: s.name,
-      description: s.description || "",
-      topic: s.topic,
-      prompt_template: s.prompt_template || "",
-      visual_style: s.visual_style,
-      voice_persona: s.voice_persona,
-      posting_frequency: s.posting_frequency,
-      posting_time: s.posting_time.slice(0, 5),
-      platforms: s.platforms,
-    });
-    setDialogOpen(true);
+    setShowCreator(false);
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.topic.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name and topic are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setSaving(true);
     try {
+      const topicData = CONTENT_TOPICS.find(t => t.id === formData.topic);
       const payload = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || null,
-        topic: formData.topic.trim(),
-        prompt_template: formData.prompt_template.trim() || null,
-        visual_style: formData.visual_style,
+        name: topicData?.name || formData.topic,
+        description: `${formData.aspect_ratio} • ${formData.duration}`,
+        topic: formData.topic,
+        visual_style: formData.art_style,
         voice_persona: formData.voice_persona,
-        posting_frequency: formData.posting_frequency,
-        posting_time: formData.posting_time + ":00",
-        platforms: formData.platforms,
+        posting_frequency: "daily",
+        posting_time: "12:00:00",
+        platforms: [formData.destination],
         user_id: user!.id,
       };
 
@@ -204,7 +219,6 @@ export default function Series() {
         toast({ title: "Series created successfully" });
       }
 
-      setDialogOpen(false);
       resetForm();
       fetchSeries();
     } catch (error) {
@@ -256,15 +270,6 @@ export default function Series() {
     }
   };
 
-  const togglePlatform = (platform: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      platforms: prev.platforms.includes(platform)
-        ? prev.platforms.filter((p) => p !== platform)
-        : [...prev.platforms, platform],
-    }));
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -273,310 +278,62 @@ export default function Series() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Video Series</h1>
-          <p className="text-muted-foreground">
-            Create automated video series that post on schedule
-          </p>
+  // Show series list or create form
+  if (!showCreator && series.length > 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary/90 to-primary rounded-2xl p-8 text-primary-foreground">
+          <h1 className="text-2xl font-bold tracking-tight mb-2">YOUR SERIES</h1>
+          <div className="w-20 h-1 bg-primary-foreground/30 rounded-full" />
         </div>
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button variant="gradient">
-              <Plus className="h-4 w-4 mr-2" />
-              New Series
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingSeries ? "Edit Series" : "Create New Series"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Series Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Daily Tech Facts"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    placeholder="Brief description of your series"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="topic">Topic/Niche *</Label>
-                  <Input
-                    id="topic"
-                    placeholder="e.g., AI, Psychology, History"
-                    value={formData.topic}
-                    onChange={(e) =>
-                      setFormData({ ...formData, topic: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prompt">Custom Prompt Template</Label>
-                  <Textarea
-                    id="prompt"
-                    placeholder="Optional: Custom instructions for generating scripts"
-                    value={formData.prompt_template}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        prompt_template: e.target.value,
-                      })
-                    }
-                    rows={3}
-                  />
-                </div>
-              </div>
 
-              {/* Visual Style */}
-              <div className="space-y-3">
-                <Label>Visual Style</Label>
-                <div className="grid grid-cols-5 gap-2">
-                  {VISUAL_STYLES.map((style) => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, visual_style: style.id })
-                      }
-                      className={`p-3 rounded-lg border text-center transition-all ${
-                        formData.visual_style === style.id
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{style.preview}</div>
-                      <div className="text-xs">{style.name}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Voice & Schedule */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Voice Persona</Label>
-                  <Select
-                    value={formData.voice_persona}
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, voice_persona: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {VOICE_PERSONAS.map((voice) => (
-                        <SelectItem key={voice.id} value={voice.id}>
-                          {voice.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Posting Frequency</Label>
-                  <Select
-                    value={formData.posting_frequency}
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, posting_frequency: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {POSTING_FREQUENCIES.map((freq) => (
-                        <SelectItem key={freq.id} value={freq.id}>
-                          {freq.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="posting_time">Posting Time</Label>
-                <Input
-                  id="posting_time"
-                  type="time"
-                  value={formData.posting_time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, posting_time: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Platforms */}
-              <div className="space-y-3">
-                <Label>Posting Platforms</Label>
-                <div className="flex gap-3">
-                  {PLATFORMS.map((platform) => (
-                    <button
-                      key={platform.id}
-                      type="button"
-                      onClick={() => togglePlatform(platform.id)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
-                        formData.platforms.includes(platform.id)
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <span>{platform.icon}</span>
-                      <span className="text-sm">{platform.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                onClick={handleSubmit}
-                disabled={saving}
-                className="w-full"
-                variant="gradient"
-              >
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {editingSeries ? "Update Series" : "Create Series"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Series Grid */}
-      {series.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Layers className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No series yet</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Create your first automated video series to start generating
-              content
-            </p>
-            <Button variant="gradient" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Series
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
+        {/* Series Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {series.map((s) => (
-            <Card key={s.id} className="relative group">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{s.name}</CardTitle>
+            <Card key={s.id} className="relative group overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">{s.name}</h3>
                     <p className="text-sm text-muted-foreground">{s.topic}</p>
                   </div>
-                  <Badge
-                    variant={s.status === "active" ? "default" : "secondary"}
-                    className={
-                      s.status === "active"
-                        ? "bg-green-500/20 text-green-400 border-green-500/30"
-                        : ""
-                    }
-                  >
+                  <Badge variant={s.status === "active" ? "default" : "secondary"}>
                     {s.status}
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {s.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {s.description}
-                  </p>
-                )}
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Video className="h-4 w-4" />
-                    <span>{s.videos_created} videos</span>
+                <div className="space-y-2 text-sm text-muted-foreground mb-4">
+                  <div className="flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    <span>{ART_STYLES.find(a => a.id === s.visual_style)?.name || s.visual_style}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{s.posting_frequency}</span>
+                  <div className="flex items-center gap-2">
+                    <Mic className="h-4 w-4" />
+                    <span>{VOICE_PERSONAS.find(v => v.id === s.voice_persona)?.name || s.voice_persona}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>{s.videos_created} videos created</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">
-                    {VISUAL_STYLES.find((st) => st.id === s.visual_style)
-                      ?.preview || "🎬"}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {VISUAL_STYLES.find((st) => st.id === s.visual_style)
-                      ?.name || s.visual_style}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  {s.platforms.map((p) => (
-                    <span key={p} className="text-sm">
-                      {PLATFORMS.find((pl) => pl.id === p)?.icon}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <div className="flex gap-2">
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant={s.status === "active" ? "outline" : "default"}
                     onClick={() => toggleStatus(s)}
+                    className="flex-1"
                   >
                     {s.status === "active" ? (
-                      <>
-                        <Pause className="h-4 w-4 mr-1" />
-                        Pause
-                      </>
+                      <><Pause className="h-4 w-4 mr-1" /> Pause</>
                     ) : (
-                      <>
-                        <Play className="h-4 w-4 mr-1" />
-                        Activate
-                      </>
+                      <><Play className="h-4 w-4 mr-1" /> Activate</>
                     )}
                   </Button>
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={() => openEditDialog(s)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
+                    variant="destructive"
                     onClick={() => deleteSeries(s.id)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -585,7 +342,326 @@ export default function Series() {
               </CardContent>
             </Card>
           ))}
+
+          {/* Add New Card */}
+          <Card
+            className="border-dashed cursor-pointer hover:border-primary transition-colors"
+            onClick={() => setShowCreator(true)}
+          >
+            <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] p-6">
+              <Plus className="h-8 w-8 text-muted-foreground mb-2" />
+              <span className="text-muted-foreground font-medium">Create New Series</span>
+            </CardContent>
+          </Card>
         </div>
+      </div>
+    );
+  }
+
+  // Show empty state or creator
+  return (
+    <div className="space-y-0">
+      {/* Hero Banner */}
+      <div className="bg-gradient-to-r from-primary/90 to-primary rounded-t-2xl p-8 text-center text-primary-foreground">
+        <h1 className="text-3xl font-bold tracking-tight mb-3">CREATE A SERIES</h1>
+        <p className="text-primary-foreground/80 max-w-md mx-auto">
+          Schedule a series of Faceless Videos to post on auto-pilot.
+        </p>
+      </div>
+
+      {/* Main Form Card */}
+      <Card className="rounded-t-none border-t-0">
+        <CardContent className="p-6 md:p-8 space-y-8">
+          {/* Step 1: Destination */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                Step 1
+              </Badge>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-primary mb-1">Destination</h2>
+              <p className="text-sm text-muted-foreground">
+                The account where your video series will be posted
+              </p>
+            </div>
+            <Select
+              value={formData.destination}
+              onValueChange={(v) => setFormData({ ...formData, destination: v })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Destination" />
+              </SelectTrigger>
+              <SelectContent>
+                {DESTINATIONS.map((dest) => (
+                  <SelectItem
+                    key={dest.id}
+                    value={dest.id}
+                    disabled={!dest.available}
+                    className="py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <dest.icon className="h-5 w-5" />
+                      <span>{dest.name}</span>
+                      {!dest.available && <Lock className="h-4 w-4 text-muted-foreground ml-auto" />}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Step 2: Content */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                Step 2
+              </Badge>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-primary mb-1">Content</h2>
+              <p className="text-sm text-muted-foreground">
+                What will your video series be about?
+              </p>
+            </div>
+            <Select
+              value={formData.topic}
+              onValueChange={(v) => setFormData({ ...formData, topic: v })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose Content" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  Custom Topic ✨
+                </div>
+                <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-1 mt-2">
+                  Popular Topics 🔥
+                </div>
+                {CONTENT_TOPICS.filter(t => !t.isCustom).map((topic) => (
+                  <SelectItem key={topic.id} value={topic.id}>
+                    <div className="flex items-center gap-2">
+                      {topic.name}
+                      {topic.isNew && (
+                        <Badge variant="secondary" className="text-xs py-0 px-1.5">
+                          New!
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button className="text-sm text-primary hover:underline">
+              Show Sample
+            </button>
+          </div>
+
+          {/* Step 3: Series Settings */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                Step 3
+              </Badge>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-primary mb-1">Series Settings</h2>
+              <p className="text-sm text-muted-foreground">
+                Preferences for every video in your series
+              </p>
+            </div>
+
+            {/* Narration Voice */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Mic className="h-4 w-4" />
+                Narration Voice
+              </Label>
+              <div className="space-y-1">
+                {VOICE_PERSONAS.map((voice) => (
+                  <button
+                    key={voice.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, voice_persona: voice.id })}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                      formData.voice_persona === voice.id
+                        ? "border-primary bg-primary/5"
+                        : "border-transparent hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <Play className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">{voice.name}</div>
+                      <div className="text-sm text-muted-foreground">{voice.description}</div>
+                    </div>
+                    {formData.voice_persona === voice.id && (
+                      <CheckCircle2 className="h-5 w-5 text-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Art Style */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Image className="h-4 w-4" />
+                Art Style
+              </Label>
+              <div className="grid grid-cols-4 gap-3">
+                {ART_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, art_style: style.id })}
+                    className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                      formData.art_style === style.id
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-b ${style.color}`} />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 text-center font-medium">
+                      {style.name.toUpperCase()}
+                    </div>
+                    {formData.art_style === style.id && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Aspect Ratio */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <MonitorPlay className="h-4 w-4" />
+                Aspect Ratio
+              </Label>
+              <div className="grid grid-cols-3 gap-3">
+                {ASPECT_RATIOS.map((ratio) => (
+                  <button
+                    key={ratio.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, aspect_ratio: ratio.id })}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                      formData.aspect_ratio === ratio.id
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <ratio.icon className="h-6 w-6" />
+                    <span className="text-sm font-medium">{ratio.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Video Language */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Video Language
+              </Label>
+              <Select
+                value={formData.language}
+                onValueChange={(v) => setFormData({ ...formData, language: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map((lang) => (
+                    <SelectItem key={lang.id} value={lang.id}>
+                      <span className="flex items-center gap-2">
+                        {lang.name} {lang.flag}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Duration Preference */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Duration Preference
+              </Label>
+              <Select
+                value={formData.duration}
+                onValueChange={(v) => setFormData({ ...formData, duration: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DURATIONS.map((dur) => (
+                    <SelectItem key={dur.id} value={dur.id}>
+                      {dur.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Step 4: Create */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                Step 4
+              </Badge>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-primary mb-1">Create</h2>
+              <p className="text-sm text-muted-foreground">
+                You will be able to preview your upcoming videos before posting
+              </p>
+            </div>
+            <Button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="w-full"
+              variant="gradient"
+              size="lg"
+            >
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              CREATE SERIES +
+            </Button>
+
+            {series.length > 0 && (
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={resetForm}
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Empty state - only show if no series */}
+      {series.length === 0 && !showCreator && (
+        <Card className="border-dashed mt-6">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Layers className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              You haven't started a Faceless Video series yet.
+            </h3>
+            <Button variant="gradient" onClick={() => setShowCreator(true)}>
+              CREATE YOUR SERIES
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
