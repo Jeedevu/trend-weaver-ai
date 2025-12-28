@@ -73,21 +73,33 @@ serve(async (req) => {
       );
     }
 
-    // Extract the token from Bearer scheme
-    const token = authHeader.replace("Bearer ", "");
-    
-    // Initialize Supabase client with service role for database operations
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    
-    // Create a client for user verification
+    // Initialize backend clients
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+      console.error("Missing backend env vars", {
+        hasUrl: Boolean(supabaseUrl),
+        hasServiceKey: Boolean(supabaseServiceKey),
+        hasAnonKey: Boolean(supabaseAnonKey),
+      });
+      return new Response(
+        JSON.stringify({ error: "Backend not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify user token ourselves (since platform JWT verification is disabled)
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Verify user with the auth client
-    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser();
+
     if (authError || !user) {
       console.error("Auth error:", authError?.message || "No user found");
       return new Response(
