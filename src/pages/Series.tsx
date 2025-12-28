@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import {
   MonitorPlay,
   Square,
   CheckCircle2,
+  Volume2,
 } from "lucide-react";
 
 interface Series {
@@ -137,6 +138,11 @@ export default function Series() {
   const [saving, setSaving] = useState(false);
   const [showCreator, setShowCreator] = useState(false);
   const [editingSeries, setEditingSeries] = useState<Series | null>(null);
+  
+  // Voice preview state
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -188,6 +194,89 @@ export default function Series() {
     });
     setEditingSeries(null);
     setShowCreator(false);
+    // Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlayingVoice(null);
+  };
+
+  const playVoicePreview = async (voiceId: string) => {
+    // If already playing this voice, stop it
+    if (playingVoice === voiceId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingVoice(null);
+      return;
+    }
+
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setLoadingVoice(voiceId);
+    setPlayingVoice(null);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-preview`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ voiceId }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate voice preview");
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setPlayingVoice(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      audio.onerror = () => {
+        setPlayingVoice(null);
+        audioRef.current = null;
+        toast({
+          title: "Error",
+          description: "Failed to play voice preview",
+          variant: "destructive",
+        });
+      };
+
+      await audio.play();
+      setPlayingVoice(voiceId);
+      
+      // Also select this voice
+      setFormData({ ...formData, voice_persona: voiceId });
+    } catch (error) {
+      console.error("Voice preview error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load voice preview",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingVoice(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -481,19 +570,36 @@ export default function Series() {
               </Label>
               <div className="space-y-1">
                 {VOICE_PERSONAS.map((voice) => (
-                  <button
+                  <div
                     key={voice.id}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, voice_persona: voice.id })}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
                       formData.voice_persona === voice.id
                         ? "border-primary bg-primary/5"
                         : "border-transparent hover:bg-muted/50"
                     }`}
+                    onClick={() => setFormData({ ...formData, voice_persona: voice.id })}
                   >
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                      <Play className="h-4 w-4" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playVoicePreview(voice.id);
+                      }}
+                      disabled={loadingVoice === voice.id}
+                      className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
+                        playingVoice === voice.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted hover:bg-primary/20"
+                      }`}
+                    >
+                      {loadingVoice === voice.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : playingVoice === voice.id ? (
+                        <Volume2 className="h-4 w-4 animate-pulse" />
+                      ) : (
+                        <Play className="h-4 w-4 ml-0.5" />
+                      )}
+                    </button>
                     <div className="flex-1 text-left">
                       <div className="font-medium">{voice.name}</div>
                       <div className="text-sm text-muted-foreground">{voice.description}</div>
@@ -501,7 +607,7 @@ export default function Series() {
                     {formData.voice_persona === voice.id && (
                       <CheckCircle2 className="h-5 w-5 text-primary" />
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
