@@ -140,8 +140,11 @@ serve(async (req) => {
       const channelId = channel?.id || null;
       const channelName = channel?.snippet?.title || null;
 
-      // Store in profile using service role
+      // Store tokens and channel info in profile using service role
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      // Calculate token expiration time
+      const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
       const { error: updateError } = await supabase
         .from("profiles")
@@ -149,6 +152,9 @@ serve(async (req) => {
           youtube_connected: true,
           youtube_channel_id: channelId,
           youtube_channel_name: channelName,
+          youtube_access_token: tokenData.access_token,
+          youtube_refresh_token: tokenData.refresh_token,
+          youtube_token_expires_at: expiresAt,
         })
         .eq("id", user.id);
 
@@ -186,7 +192,7 @@ serve(async (req) => {
         );
       }
 
-      // Update profile
+      // Update profile - clear all YouTube data including tokens
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const { error: updateError } = await supabase
         .from("profiles")
@@ -194,6 +200,9 @@ serve(async (req) => {
           youtube_connected: false,
           youtube_channel_id: null,
           youtube_channel_name: null,
+          youtube_access_token: null,
+          youtube_refresh_token: null,
+          youtube_token_expires_at: null,
         })
         .eq("id", user.id);
 
