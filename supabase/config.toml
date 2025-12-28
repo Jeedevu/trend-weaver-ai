@@ -7,7 +7,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-video]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-video-status]
 verify_jwt = true
