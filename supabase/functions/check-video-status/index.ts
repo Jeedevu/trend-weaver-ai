@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const JSON2VIDEO_API_KEY = Deno.env.get("JSON2VIDEO_API_KEY");
-const JSON2VIDEO_BASE_URL = "https://api.json2video.com/v2";
+const FAL_KEY = Deno.env.get("FAL_KEY");
+const FAL_STATUS_URL = "https://queue.fal.run/fal-ai/sora-2/text-to-video/requests";
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    if (!JSON2VIDEO_API_KEY) {
+    if (!FAL_KEY) {
       return new Response(
         JSON.stringify({ error: "Video API not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -49,56 +49,75 @@ serve(async (req) => {
 
     if (!project_id || !video_id) {
       return new Response(
-        JSON.stringify({ error: "project_id and video_id are required" }),
+        JSON.stringify({ error: "project_id (fal request_id) and video_id are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Checking status for project: ${project_id}, video: ${video_id}`);
+    console.log(`Checking status for fal.ai request: ${project_id}, video: ${video_id}`);
 
-    // Check status with JSON2Video
-    const statusResponse = await fetch(
-      `${JSON2VIDEO_BASE_URL}/movies?project=${project_id}`,
-      {
-        method: "GET",
-        headers: {
-          "x-api-key": JSON2VIDEO_API_KEY,
-        },
-      }
-    );
+    // Check status with fal.ai
+    const statusResponse = await fetch(`${FAL_STATUS_URL}/${project_id}/status`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Key ${FAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-    const statusData = await statusResponse.json();
-    console.log("Status response:", JSON.stringify(statusData));
-
-    if (!statusData.success) {
+    if (!statusResponse.ok) {
+      const errorText = await statusResponse.text();
+      console.error("fal.ai status error:", statusResponse.status, errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to check video status", details: statusData }),
+        JSON.stringify({ error: "Failed to check video status", details: errorText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const movie = statusData.movie;
+    const statusData = await statusResponse.json();
+    console.log("Status response:", JSON.stringify(statusData));
+
     let videoStatus: "generating" | "ready" | "failed" = "generating";
     let videoUrl: string | null = null;
     let thumbnailUrl: string | null = null;
     let duration: number | null = null;
 
-    switch (movie.status) {
-      case "done":
-        videoStatus = "ready";
-        videoUrl = movie.url;
-        duration = Math.round(movie.duration);
-        // Generate thumbnail from first frame (could be enhanced later)
-        thumbnailUrl = movie.url?.replace(".mp4", "_thumb.jpg") || null;
+    // fal.ai status can be: IN_QUEUE, IN_PROGRESS, COMPLETED, FAILED
+    switch (statusData.status) {
+      case "COMPLETED":
+        // Need to fetch the result separately
+        const resultResponse = await fetch(`${FAL_STATUS_URL}/${project_id}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (resultResponse.ok) {
+          const resultData = await resultResponse.json();
+          console.log("Result data:", JSON.stringify(resultData));
+          
+          videoStatus = "ready";
+          videoUrl = resultData.video?.url || null;
+          thumbnailUrl = resultData.thumbnail?.url || null;
+          duration = resultData.video?.duration || null;
+        } else {
+          videoStatus = "failed";
+          console.error("Failed to fetch result:", await resultResponse.text());
+        }
         break;
-      case "error":
+      case "FAILED":
         videoStatus = "failed";
-        console.error("Video rendering failed:", movie.message);
+        console.error("Video rendering failed:", statusData.error);
         break;
-      case "pending":
-      case "running":
+      case "IN_QUEUE":
+      case "IN_PROGRESS":
         videoStatus = "generating";
         break;
+      default:
+        console.log("Unknown status:", statusData.status);
+        videoStatus = "generating";
     }
 
     // Update video record in database
@@ -113,10 +132,10 @@ serve(async (req) => {
       updateData.thumbnail_url = thumbnailUrl;
     }
     if (duration) {
-      updateData.duration_seconds = duration;
+      updateData.duration_seconds = Math.round(duration);
     }
     if (videoStatus === "failed") {
-      updateData.error_message = movie.message || "Video rendering failed";
+      updateData.error_message = statusData.error || "Video rendering failed";
     }
 
     const { error: updateError } = await supabase
@@ -136,8 +155,8 @@ serve(async (req) => {
         video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         duration: duration,
-        message: movie.message || null,
-        remaining_quota: statusData.remaining_quota,
+        message: statusData.error || null,
+        queue_position: statusData.queue_position || null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
